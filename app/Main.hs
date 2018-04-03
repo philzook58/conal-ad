@@ -1,9 +1,10 @@
-{-# LANGUAGE ConstraintKinds, TypeFamilies, FlexibleInstances, MultiParamTypeClasses, NoImplicitPrelude #-}
+{-# LANGUAGE ConstraintKinds, TypeFamilies, FlexibleInstances, MultiParamTypeClasses, NoImplicitPrelude, FlexibleContexts #-}
 
 module Main where
 
 import Lib
 import Control.Category.Constrained.Prelude
+import Control.Arrow.Constrained
 --import Prelude hiding (id, (.), uncurry, curry)
 
 
@@ -13,7 +14,7 @@ linearD :: (a -> b) -> (k a b) -> D k a b
 linearD f f' = D (\a -> (f a, f'))
 
 instance Category k => Category (D k) where
-    type (Object (D k) o) = (Additive o, (Object k o)) -- constraints that the objects must satisfy
+    type (Object (D k) o) = (Object k o) -- constraints that the objects must satisfy (Additive o, 
     id = linearD id id
     (D g) . (D f) = D (\a -> let (b , f') = f a
                                  (c , g') = g b in (c, g' . f')) 
@@ -24,8 +25,8 @@ instance Category k => Category (D k) where
 
 
 instance Cartesian k => Cartesian (D k) where
-   type (PairObject (D k) a b) = PairObject k a b
-   type (UnitObject (D k) a) = UnitObject k a 
+   type (PairObjects (D k) a b) = PairObjects k a b
+   type UnitObject (D k) = UnitObject k
    swap = linearD swap swap
    attachUnit = linearD attachUnit attachUnit
    detachUnit = linearD detachUnit detachUnit
@@ -38,21 +39,22 @@ instance Cartesian k => Cartesian (D k) where
 -- morphism is basically what Conal calls being Monoidal
 -- and *** = Big Cross
 instance Morphism k => Morphism (D k) where
-    (D f) (***) (D g) = D $ \(a, b) -> let (c,f') = f a
-                                           (d, g') = g b in
-                                           ((c,d, f' *** g'))
+    (D f) *** (D g) = D $ \(a, b) -> let (c,f') = f a
+                                         (d, g') = g b in
+                                         ((c,d, f' *** g'))
                                              -- paralell arrows
 
 -- exl = fst
 -- exr = snd
 -- triangle = &&&
 
+dup :: (PreArrow a, Object a b, ObjectPair a b b) => a b (b, b) 
 dup = id &&& id
 
 instance PreArrow a => PreArrow (D a) where
     fst = linearD fst fst
     snd = linearD snd snd
-    (&&&) = (***) . dup' where dup' = linearD dup dup
+    f &&& g = (f *** g) . dup' where dup' = linearD dup dup
     terminal = linearD terminal terminal
 
 
